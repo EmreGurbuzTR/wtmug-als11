@@ -1,4 +1,4 @@
-const CACHE = 'vision-test-v2'; // Sürüm numarası güncellendi
+﻿const CACHE = 'vision-test-v2'; // Sürüm numarası güncellendi
 const PRECACHE = [
   './', 
   './index.html', 
