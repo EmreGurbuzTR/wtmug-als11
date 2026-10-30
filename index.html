@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P2P Görme Testi</title>
+<link rel="manifest" href="manifest.json">
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<style>
+  :root { --bg:#0b1220; --surface:#151d2f; --border:#2a3448; --text:#e7ecf5; --muted:#8f9bb3; --accent:#4ade80; --blue:#60a5fa; --danger:#f87171; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:sans-serif; display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+  header { padding:15px; background:#16213a; border-bottom:1px solid var(--border); text-align:center; font-weight:bold; font-size:18px; }
+  
+  .container { flex:1; display:flex; flex-direction:column; padding:20px; max-width:800px; margin:0 auto; width:100%; box-sizing:border-box; overflow-y:auto; }
+  
+  /* Ekranlar */
+  .screen { display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100%; text-align:center; }
+  .screen.active { display:flex; }
+  
+  /* Butonlar */
+  .btn { width:100%; max-width:300px; padding:15px; border-radius:12px; border:none; font-size:18px; font-weight:bold; cursor:pointer; margin-bottom:10px; }
+  .btn-primary { background:var(--blue); color:#000; }
+  .btn-accent { background:var(--accent); color:#000; }
+  
+  /* Doktor Ekranı */
+  #qrArea { background:white; padding:20px; border-radius:12px; margin:20px 0; }
+  .big-letter { font-size: 40vh; font-family: monospace; font-weight: bold; line-height:1; margin:0; color:#000; }
+  .doctor-display { background:white; width:100%; height:60vh; border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+  .timer-text { font-size:64px; font-weight:bold; color:var(--danger); margin-bottom:20px; }
+  
+  /* Hasta Ekranı */
+  #scannerContainer { display:none; position:relative; width:100%; max-width:300px; aspect-ratio:1/1; border-radius:12px; overflow:hidden; border:2px solid var(--border); }
+  #scannerVideo { width:100%; height:100%; object-fit:cover; }
+  .patient-input-area { display:none; width:100%; max-width:300px; margin-top:20px; }
+  .patient-input-area input { width:100%; padding:20px; font-size:32px; text-align:center; border-radius:10px; border:2px solid var(--blue); background:var(--surface); color:white; text-transform:uppercase; outline:none; }
+  .patient-input-area button { margin-top:10px; background:var(--accent); color:#000; }
+  .status-box { padding:15px; border-radius:10px; background:var(--surface); border:1px solid var(--border); font-size:16px; margin:10px 0; }
+  
+  /* Teşhis Ekranı */
+  .diagnosis-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; width:100%; max-width:400px; text-align:left; }
+  .diagnosis-card h3 { color:var(--blue); margin-top:0; }
+  .diagnosis-card .result-row { display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding:10px 0; font-size:16px; }
+  .diagnosis-card .result-row:last-child { border-bottom:none; }
+  .disclaimer { font-size:11px; color:var(--danger); margin-top:20px; text-align:center; }
+
+  /* Log */
+  .log-box { width:100%; background:#080b13; border:1px solid var(--border); border-radius:10px; padding:10px; overflow-y:auto; height:100px; font-family:monospace; font-size:12px; color:var(--muted); text-align:left; margin-top:10px; }
+</style>
+</head>
+<body>
+
+<header>👁️ P2P Görme Testi Sistemi</header>
+
+<div class="container">
+  
+  <!-- 1. ROL SEÇİM EKRANI -->
+  <div id="roleScreen" class="screen active">
+    <h2>Lütfen Rolünüzü Seçin</h2>
+    <button class="btn btn-primary" onclick="startRole('doctor')">👨‍⚕️ Doktorum (Testi Başlat)</button>
+    <button class="btn btn-accent" onclick="startRole('patient')">🧑‍🦱 Hastayım (Teste Katıl)</button>
+  </div>
+
+  <!-- 2. DOKTOR EKRANI -->
+  <div id="doctorScreen" class="screen">
+    <!-- QR Gösterme Aşaması -->
+    <div id="doctorQrArea" style="display:none;">
+      <h2>Hasta İçin QR Kodu</h2>
+      <p style="font-size:14px; color:var(--muted);">Hastanın telefonundan bu kodu okutmasını isteyin.</p>
+      <div id="qrArea">QR Yükleniyor...</div>
+      <div id="doctorStatus" class="status-box">Hasta bekleniyor...</div>
+    </div>
+
+    <!-- Test / Geri Sayım Aşaması -->
+    <div id="doctorTestArea" style="display:none; width:100%;">
+      <div id="doctorTimer" class="timer-text">60</div>
+      <div id="doctorLetterContainer" class="doctor-display" style="display:none;">
+        <div id="doctorLetter" class="big-letter"></div>
+      </div>
+      <div id="doctorInstruction" class="status-box">Hastanın yerleşmesini bekleyin...</div>
+      <div class="log-box" id="doctorLog"></div>
+    </div>
+  </div>
+
+  <!-- 3. HASTA EKRANI -->
+  <div id="patientScreen" class="screen">
+    <!-- QR Tarama Aşaması -->
+    <div id="patientScannerArea">
+      <h2>Doktorun QR Kodunu Okutun</h2>
+      <div id="scannerContainer">
+        <video id="scannerVideo" playsinline autoplay muted></video>
+      </div>
+      <div id="patientStatus" class="status-box">Kamera Başlatılıyor...</div>
+    </div>
+
+    <!-- Test Aşaması -->
+    <div id="patientTestArea" style="display:none;">
+      <div id="patientTimer" class="timer-text">60</div>
+      <div id="patientInstruction" class="status-box">Lütfen bekleyin...</div>
+      
+      <div id="patientInputContainer" class="patient-input-area">
+        <input type="text" id="patientInput" maxlength="1" placeholder="?" autocomplete="off">
+        <button class="btn" onclick="submitPatientAnswer()">Onayla</button>
+        <button class="btn" onclick="submitPatientAnswer('BLANK')" style="background:var(--danger); color:white; padding:10px; font-size:14px;">Göremedim</button>
+      </div>
+    </div>
+
+    <!-- Sonuç Aşaması -->
+    <div id="patientResultArea" style="display:none; width:100%; align-items:center; flex-direction:column;">
+      <h2 style="color:var(--accent);">Test Tamamlandı</h2>
+      <div class="diagnosis-card" id="patientDiagnosis">
+        <!-- Sonuçlar buraya -->
+      </div>
+      <p class="disclaimer">* Bu test ön tarama amaçlıdır. Kesin teşhis için göz doktorunuza muayene olunuz.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// --- Değişkenler ---
+let peer = null;
+let conn = null;
+let currentRole = null;
+let scannerActive = false;
+let videoStream = null;
+
+// Test Değişkenleri
+const TOTAL_QUESTIONS = 8; // Her göz için soru sayısı
+let testState = {
+  currentEye: 'left',
+  questionIndex: 0,
+  leftAnswers: [],
+  rightAnswers: [],
+  currentLetter: '',
+  sizes: [200, 150, 120, 90, 70, 50, 35, 20], // px boyutları
+  letters: ['E', 'F', 'P', 'T', 'O', 'Z', 'L', 'D', 'C'],
+  timerInterval: null
+};
+
+// --- Rol Başlatma ---
+function startRole(role) {
+  currentRole = role;
+  document.getElementById('roleScreen').classList.remove('active');
+  
+  if (role === 'doctor') {
+    document.getElementById('doctorScreen').classList.add('active');
+    initDoctor();
+  } else {
+    document.getElementById('patientScreen').classList.add('active');
+    initPatient();
+  }
+}
+
+// ==========================================
+// DOKTOR MANTIĞI
+// ==========================================
+function initDoctor() {
+  document.getElementById('doctorQrArea').style.display = 'block';
+  peer = new Peer();
+  
+  peer.on('open', (id) => {
+    const qr = qrcode(0, 'M');
+    qr.addData(id);
+    qr.make();
+    document.getElementById('qrArea').innerHTML = qr.createImgTag(6, 0);
+    logDoctor("Sistem hazır. QR Kod oluşturuldu.");
+  });
+
+  peer.on('connection', (connection) => {
+    conn = connection;
+    document.getElementById('doctorStatus').innerText = "Hasta bağlandı!";
+    document.getElementById('doctorStatus').style.color = "var(--accent)";
+    logDoctor("Hasta bağlantısı kuruldu.");
+    
+    document.getElementById('doctorQrArea').style.display = 'none';
+    document.getElementById('doctorTestArea').style.display = 'block';
+    
+    conn.on('data', (data) => handlePatientData(data));
+    
+    // Testi başlat: 60 saniyelik hazırlık süresi
+    startSetupTimer(60, 'Sol Göz Hazırlığı', () => {
+      startEyeTest('left');
+    });
+  });
+}
+
+function startSetupTimer(seconds, title, callback) {
+  const timerEl = document.getElementById('doctorTimer');
+  const instrEl = document.getElementById('doctorInstruction');
+  instrEl.innerText = title + " - Hasta hazırlanıyor...";
+  timerEl.style.display = 'block';
+  timerEl.innerText = seconds;
+  
+  conn.send({ type: 'timer', seconds: seconds, title: title });
+  
+  let timeLeft = seconds;
+  testState.timerInterval = setInterval(() => {
+    timeLeft--;
+    timerEl.innerText = timeLeft;
+    conn.send({ type: 'timer_update', seconds: timeLeft });
+    
+    if (timeLeft <= 0) {
+      clearInterval(testState.timerInterval);
+      timerEl.style.display = 'none';
+      callback();
+    }
+  }, 1000);
+}
+
+function startEyeTest(eye) {
+  testState.currentEye = eye;
+  testState.questionIndex = 0;
+  testState.currentEye === 'left' ? testState.leftAnswers = [] : testState.rightAnswers = [];
+  
+  logDoctor(`--- ${eye === 'left' ? 'SOL' : 'SAĞ'} GÖZ TESTİ BAŞLADI ---`);
+  document.getElementById('doctorLetterContainer').style.display = 'flex';
+  document.getElementById('doctorInstruction').innerText = `Hasta ${eye === 'left' ? 'SOL' : 'SAĞ'} gözünü kapatmalı.`;
+  
+  sendNextQuestion();
+}
+
+function sendNextQuestion() {
+  if (testState.questionIndex >= TOTAL_QUESTIONS) {
+    endEyeTest();
+    return;
+  }
+
+  const size = testState.sizes[testState.questionIndex];
+  // Rastgele bir harf seç
+  const randomLetter = testState.letters[Math.floor(Math.random() * testState.letters.length)];
+  testState.currentLetter = randomLetter;
+
+  const letterEl = document.getElementById('doctorLetter');
+  letterEl.style.fontSize = size + 'px';
+  letterEl.innerText = randomLetter;
+
+  // Hastaya harfi gönder
+  conn.send({ type: 'show_letter', size: size, eye: testState.currentEye });
+  
+  document.getElementById('doctorInstruction').innerText = `Bekleniyor: Hasta harfi yazsın...`;
+  logDoctor(`Gönderilen Harf: ${randomLetter} (Boyut: ${size})`);
+}
+
+function handlePatientData(data) {
+  if (data.type === 'answer') {
+    const isCorrect = data.answer === testState.currentLetter;
+    logDoctor(`Hasta Cevabı: ${data.answer} (${isCorrect ? 'DOĞRU' : 'YANLIŞ'})`);
+    
+    const currentAnswers = testState.currentEye === 'left' ? testState.leftAnswers : testState.rightAnswers;
+    currentAnswers.push({
+      sizeIndex: testState.questionIndex,
+      size: testState.sizes[testState.questionIndex],
+      expected: testState.currentLetter,
+      given: data.answer,
+      isCorrect: isCorrect
+    });
+
+    testState.questionIndex++;
+    sendNextQuestion();
+  }
+}
+
+function endEyeTest() {
+  document.getElementById('doctorLetterContainer').style.display = 'none';
+  
+  if (testState.currentEye === 'left') {
+    logDoctor("Sol göz testi bitti. Göz değiştirme aşamasına geçiliyor.");
+    startSetupTimer(30, 'Sağ Göz Hazırlığı', () => {
+      startEyeTest('right');
+    });
+  } else {
+    logDoctor("Sağ göz testi bitti. Sonuçlar hesaplanıyor.");
+    calculateResults();
+  }
+}
+
+// ==========================================
+// HASTA MANTIĞI
+// ==========================================
+function initPatient() {
+  startScanner();
+  peer = new Peer();
+}
+
+async function startScanner() {
+  const container = document.getElementById('scannerContainer');
+  const video = document.getElementById('scannerVideo');
+  
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = videoStream;
+    video.setAttribute('playsinline', true);
+    video.play();
+    
+    container.style.display = 'block';
+    scannerActive = true;
+    document.getElementById('patientStatus').innerText = "QR Kod Aranıyor...";
+    requestAnimationFrame(tick);
+  } catch (err) {
+    document.getElementById('patientStatus').innerText = "Kamera Hatası: " + err.message;
+  }
+}
+
+function tick() {
+  if (!scannerActive) return;
+  const video = document.getElementById('scannerVideo');
+  
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    
+    if (code) {
+      scannerActive = false;
+      if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+      document.getElementById('scannerContainer').style.display = 'none';
+      document.getElementById('patientStatus').innerText = "Doktora bağlanılıyor...";
+      
+      connectToDoctor(code.data);
+      return;
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+function connectToDoctor(doctorId) {
+  const connection = peer.connect(doctorId);
+  conn = connection;
+
+  conn.on('open', () => {
+    document.getElementById('patientStatus').innerText = "Bağlantı kuruldu!";
+    document.getElementById('patientScannerArea').style.display = 'none';
+    document.getElementById('patientTestArea').style.display = 'block';
+  });
+
+  conn.on('data', (data) => {
+    if (data.type === 'timer') {
+      document.getElementById('patientTimer').style.display = 'block';
+      document.getElementById('patientTimer').innerText = data.seconds;
+      document.getElementById('patientInstruction').innerText = data.title;
+      document.getElementById('patientInputContainer').style.display = 'none';
+    } 
+    else if (data.type === 'timer_update') {
+      document.getElementById('patientTimer').innerText = data.seconds;
+    } 
+    else if (data.type === 'show_letter') {
+      document.getElementById('patientTimer').style.display = 'none';
+      document.getElementById('patientInstruction').innerText = `Ekrandaki harfi yazın (${data.eye === 'left' ? 'SOL' : 'SAĞ'} Göz)`;
+      
+      const inputContainer = document.getElementById('patientInputContainer');
+      inputContainer.style.display = 'block';
+      
+      const input = document.getElementById('patientInput');
+      input.value = '';
+      input.focus();
+    }
+    else if (data.type === 'results') {
+      showPatientResults(data);
+    }
+  });
+}
+
+function submitPatientAnswer(answer = null) {
+  const input = document.getElementById('patientInput');
+  const finalAnswer = answer || input.value.toUpperCase();
+  
+  if (!finalAnswer) return; // Boş geçme
+
+  conn.send({ type: 'answer', answer: finalAnswer });
+  
+  document.getElementById('patientInputContainer').style.display = 'none';
+  document.getElementById('patientInstruction').innerText = "Cevap gönderildi. Sonraki harf bekleniyor...";
+}
+
+// ==========================================
+// SONUÇ HESAPLAMA VE TEŞHİS
+// ==========================================
+function calculateResults() {
+  // Skorları hesapla (Kaç doğru var?)
+  const leftCorrect = testState.leftAnswers.filter(a => a.isCorrect).length;
+  const rightCorrect = testState.rightAnswers.filter(a => a.isCorrect).length;
+  
+  // Tanı Algoritması (Basitleştirilmiş Tıbbi Simülasyon)
+  function diagnose(answers, correctCount) {
+    // Hangi sorularda (boyutlarda) hata yaptı?
+    // İlk sorular büyük harfler (0,1,2), son sorular küçük harfler (5,6,7)
+    
+    if (correctCount >= 7) {
+      return { status: "Normal Görüş", acuity: "10/10 (20/20)", type: "-" };
+    }
+    
+    if (correctCount <= 2) {
+      return { status: "Ciddi Görme Kaybı", acuity: "< 10/50", type: "Miyop (İleri Düzey)" };
+    }
+
+    // Hata dağılımına bak
+    let smallErrors = 0; // Son 3 soru (küçük harfler)
+    let midErrors = 0;   // Orta sorular
+    let randomErrors = 0;
+    let astigmatismRisk = 0;
+
+    answers.forEach((ans, index) => {
+      if (!ans.isCorrect) {
+        if (index >= 5) smallErrors++; // Küçük harfleri göremedi
+        else if (index >= 2 && index < 5) midErrors++; // Orta boyları göremedi
+        
+        // Astigmatizm kontrolü (E, F, P, B gibi harfleri karıştırma)
+        if ((ans.expected === 'E' && ans.given === 'B') || 
+            (ans.expected === 'F' && ans.given === 'P') ||
+            (ans.expected === 'B' && ans.given === 'E')) {
+          astigmatismRisk++;
+        }
+      }
+    });
+
+    let type = "Miyop";
+    if (smallErrors >= 2) type = "Miyop (Uzağı Görememe)";
+    else if (midErrors >= 2) type = "Hipermetrop (Yakını Görememe)";
+    
+    if (astigmatismRisk >= 2) type += " + Astigmat";
+
+    // Derece tahmini (Örn: 8 soruda 4 doğru yaptıysa)
+    const errorRate = (TOTAL_QUESTIONS - correctCount) / TOTAL_QUESTIONS;
+    const degree = (errorRate * 4).toFixed(2); // 0.00 ile 4.00 arası bir değer
+
+    return { 
+      status: "Görme Kaybı Tespit Edildi", 
+      acuity: `10/${Math.max(10, 10 + (TOTAL_QUESTIONS - correctCount) * 10)}`,
+      type: type,
+      degree: `-${degree}` // Miyoplar için eksi değer
+    };
+  }
+
+  const leftResult = diagnose(testState.leftAnswers, leftCorrect);
+  const rightResult = diagnose(testState.rightAnswers, rightCorrect);
+
+  const resultsData = {
+    type: 'results',
+    left: leftResult,
+    right: rightResult
+  };
+
+  // Hastaya sonuçları gönder
+  conn.send(resultsData);
+  showPatientResults(resultsData);
+  logDoctor("Test tamamlandı. Sonuçlar hastaya gönderildi.");
+}
+
+function showPatientResults(data) {
+  document.getElementById('patientTestArea').style.display = 'none';
+  document.getElementById('patientResultArea').style.display = 'flex';
+  
+  const html = `
+    <h3>Sol Göz Sonucu</h3>
+    <div class="result-row"><span>Durum:</span> <b>${data.left.status}</b></div>
+    <div class="result-row"><span>Görme Keskinliği:</span> <b>${data.left.acuity}</b></div>
+    <div class="result-row"><span>Olası Tanı:</span> <b>${data.left.type}</b></div>
+    ${data.left.degree ? `<div class="result-row"><span>Tahmini Derece:</span> <b>${data.left.degree}</b></div>` : ''}
+    
+    <h3 style="margin-top:20px;">Sağ Göz Sonucu</h3>
+    <div class="result-row"><span>Durum:</span> <b>${data.right.status}</b></div>
+    <div class="result-row"><span>Görme Keskinliği:</span> <b>${data.right.acuity}</b></div>
+    <div class="result-row"><span>Olası Tanı:</span> <b>${data.right.type}</b></div>
+    ${data.right.degree ? `<div class="result-row"><span>Tahmini Derece:</span> <b>${data.right.degree}</b></div>` : ''}
+  `;
+  
+  document.getElementById('patientDiagnosis').innerHTML = html;
+}
+
+function logDoctor(msg) {
+  const log = document.getElementById('doctorLog');
+  log.innerHTML += `> ${msg}<br>`;
+  log.scrollTop = log.scrollHeight;
+}
+
+</script>
+</body>
+</html>

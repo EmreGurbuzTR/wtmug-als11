@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#60a5fa"/>
+      <stop offset="1" stop-color="#4ade80"/>
+    </linearGradient>
+  </defs>
+  <!-- Arka Plan -->
+  <rect width="512" height="512" rx="112" fill="#0b1220"/>
+  <rect x="36" y="36" width="440" height="440" rx="90" fill="none" stroke="url(#g)" stroke-width="12"/>
+  
+  <!-- Göz Dış Çizgisi -->
+  <path d="M 96 256 Q 256 100 416 256 Q 256 412 96 256 Z" fill="none" stroke="#e7ecf5" stroke-width="16" stroke-linejoin="round"/>
+  
+  <!-- İris ve Göz Bebeği -->
+  <circle cx="256" cy="256" r="76" fill="#60a5fa"/>
+  <circle cx="256" cy="256" r="32" fill="#0b1220"/>
+  
+  <!-- Işık Yansıması (Parlama) -->
+  <circle cx="278" cy="234" r="12" fill="#ffffff" opacity="0.8"/>
+
+  <!-- Görme Testi Çizgileri (E Harfi Esintisi) -->
+  <g fill="none" stroke="#4ade80" stroke-width="12" stroke-linecap="round">
+    <path d="M 130 210 L 180 210 M 130 256 L 170 256 M 130 302 L 180 302 M 130 210 L 130 302"/>
+    <path d="M 382 210 L 332 210 M 382 256 L 342 256 M 382 302 L 332 302 M 382 210 L 382 302"/>
+  </g>
+</svg>
