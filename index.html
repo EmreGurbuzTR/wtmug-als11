@@ -21,13 +21,14 @@
   .btn { width:100%; max-width:300px; padding:15px; border-radius:12px; border:none; font-size:18px; font-weight:bold; cursor:pointer; margin-bottom:10px; }
   .btn-primary { background:var(--blue); color:#000; }
   .btn-accent { background:var(--accent); color:#000; }
+  .btn:disabled { opacity:0.5; cursor:not-allowed; }
   
   #qrArea { background:white; padding:20px; border-radius:12px; margin:20px 0; }
   .big-letter { font-size: 40vh; font-family: monospace; font-weight: bold; line-height:1; margin:0; color:#000; }
   .doctor-display { background:white; width:100%; height:60vh; border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
   .timer-text { font-size:64px; font-weight:bold; color:var(--danger); margin-bottom:20px; }
   
-  #scannerContainer { display:none; position:relative; width:100%; max-width:300px; aspect-ratio:1/1; border-radius:12px; overflow:hidden; border:2px solid var(--border); }
+  #scannerContainer { display:none; position:relative; width:100%; max-width:300px; aspect-ratio:1/1; border-radius:12px; overflow:hidden; border:2px solid var(--border); margin-top:20px;}
   #scannerVideo { width:100%; height:100%; object-fit:cover; }
   
   .patient-input-area { display:none; width:100%; max-width:300px; margin-top:10px; }
@@ -36,9 +37,9 @@
   
   .status-box { padding:15px; border-radius:10px; background:var(--surface); border:1px solid var(--border); font-size:16px; margin:10px 0; }
   
-  /* Hasta Bilgilendirme Uyarı Alanı */
-  #patientWarning { 
-    display:none; 
+  /* Bilgilendirme Uyarı Alanı (Pre-Scan) */
+  .warning-box { 
+    display:block; 
     background:var(--danger); 
     color:white; 
     padding:20px; 
@@ -50,17 +51,21 @@
     margin-bottom:20px; 
     box-shadow: 0 4px 15px rgba(248,113,113,0.4);
     border: 2px solid #ffb3b3;
+    max-width: 400px;
+    width: 100%;
+    box-sizing: border-box;
   }
-  #patientWarning .warn-title {
-    text-align: center;
-    font-size: 18px;
-    margin-bottom: 10px;
-    text-transform: uppercase;
+  .warning-box .warn-title { text-align: center; font-size: 18px; margin-bottom: 10px; text-transform: uppercase; }
+  .warning-box .highlight { background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; }
+  
+  /* Onay Kutusu */
+  .confirm-area { 
+    display: flex; align-items: center; justify-content: center; gap: 10px; 
+    background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; 
+    margin-top: 15px; cursor: pointer; font-size: 15px;
   }
-  #patientWarning .highlight {
-    background: rgba(0,0,0,0.2);
-    padding: 2px 6px;
-    border-radius: 4px;
+  .confirm-area input[type="checkbox"] { 
+    width: 24px; height: 24px; cursor: pointer; accent-color: var(--accent); 
   }
 
   .diagnosis-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; width:100%; max-width:400px; text-align:left; }
@@ -74,14 +79,14 @@
 </head>
 <body>
 
-<header>??? P2P Görme Testi Sistemi</header>
+<header>👁️ P2P Görme Testi Sistemi</header>
 
 <div class="container">
   
   <div id="roleScreen" class="screen active">
     <h2>Lütfen Rolünüzü Seçin</h2>
-    <button class="btn btn-primary" onclick="startRole('doctor')">????? Doktorum (Testi Başlat)</button>
-    <button class="btn btn-accent" onclick="startRole('patient')">????? Hastayım (Teste Katıl)</button>
+    <button class="btn btn-primary" onclick="startRole('doctor')">👨‍⚕️ Doktorum (Testi Başlat)</button>
+    <button class="btn btn-accent" onclick="startRole('patient')">🧑‍🦱 Hastayım (Teste Katıl)</button>
   </div>
 
   <!-- DOKTOR EKRANI -->
@@ -101,23 +106,22 @@
       <div id="doctorInstruction" class="status-box">Hastanın yerleşmesini bekleyin...</div>
       <div class="log-box" id="doctorLog"></div>
     </div>
+
+    <!-- DOKTOR SONUÇ EKRANI -->
+    <div id="doctorResultArea" style="display:none; width:100%; align-items:center; flex-direction:column;">
+      <h2 style="color:var(--accent);">Test Tamamlandı (Hasta Sonuçları)</h2>
+      <div class="diagnosis-card" id="doctorDiagnosis"></div>
+      <div class="log-box" id="doctorLogResult" style="margin-top:20px;"></div>
+    </div>
   </div>
 
   <!-- HASTA EKRANI -->
   <div id="patientScreen" class="screen">
-    <div id="patientScannerArea">
-      <h2>Doktorun QR Kodunu Okutun</h2>
-      <div id="scannerContainer">
-        <video id="scannerVideo" playsinline autoplay muted></video>
-      </div>
-      <div id="patientStatus" class="status-box">Kamera Başlatılıyor...</div>
-    </div>
-
-    <div id="patientTestArea" style="display:none; width:100%; align-items:center; flex-direction:column;">
-      
-      <!-- GÜNCELLENMİŞ BİLGİLENDİRME UYARISI -->
-      <div id="patientWarning">
-        <div class="warn-title">?? LÜTFEN DİKKAT!</div>
+    
+    <!-- 1. Aşama: Bilgilendirme ve Onay -->
+    <div id="patientPreScanArea" style="display:none; width:100%; flex-direction:column; align-items:center;">
+      <div class="warning-box">
+        <div class="warn-title">⚠️ LÜTFEN DİKKAT!</div>
         DOKTOR EKRANINDA GÖRECEĞİNİZ HER BİR HARFİ KENDİ TELEFONUNUZDAN GİRMENİZ İÇİN <span class="highlight">5 SANİYENİZ</span> OLACAKTIR.<br><br>
         5 SANİYE İÇİNDE GİRİLMEYEN HARFLER <span class="highlight">YANLIŞ</span> KABUL EDİLECEKTİR.<br><br>
         <div style="text-align: center; border-top: 1px dashed rgba(255,255,255,0.3); padding-top: 10px;">
@@ -126,6 +130,25 @@
         </div>
       </div>
       
+      <label class="confirm-area" for="patientConfirmCheck">
+        <input type="checkbox" id="patientConfirmCheck" onchange="toggleScanButton()">
+        <span>Okudum, anladım.</span>
+      </label>
+      
+      <button id="btnStartScan" class="btn btn-primary" disabled onclick="beginScanning()" style="margin-top:10px;">Kamerayı Başlat</button>
+    </div>
+
+    <!-- 2. Aşama: QR Tarama -->
+    <div id="patientScannerArea" style="display:none;">
+      <h2>Doktorun QR Kodunu Okutun</h2>
+      <div id="scannerContainer">
+        <video id="scannerVideo" playsinline autoplay muted></video>
+      </div>
+      <div id="patientStatus" class="status-box">Kamera Başlatılıyor...</div>
+    </div>
+
+    <!-- 3. Aşama: Test -->
+    <div id="patientTestArea" style="display:none; width:100%; align-items:center; flex-direction:column;">
       <div id="patientTimer" class="timer-text" style="display:none;">5</div>
       <div id="patientInstruction" class="status-box">Lütfen bekleyin...</div>
       
@@ -136,6 +159,7 @@
       </div>
     </div>
 
+    <!-- 4. Aşama: Hasta Sonuç -->
     <div id="patientResultArea" style="display:none; width:100%; align-items:center; flex-direction:column;">
       <h2 style="color:var(--accent);">Test Tamamlandı</h2>
       <div class="diagnosis-card" id="patientDiagnosis"></div>
@@ -175,8 +199,20 @@ function startRole(role) {
     initDoctor();
   } else {
     document.getElementById('patientScreen').classList.add('active');
-    initPatient();
+    // Hasta önce bilgilendirme ekranını görür
+    document.getElementById('patientPreScanArea').style.display = 'flex';
   }
+}
+
+function toggleScanButton() {
+  const isChecked = document.getElementById('patientConfirmCheck').checked;
+  document.getElementById('btnStartScan').disabled = !isChecked;
+}
+
+function beginScanning() {
+  document.getElementById('patientPreScanArea').style.display = 'none';
+  document.getElementById('patientScannerArea').style.display = 'block';
+  initPatient();
 }
 
 // ==========================================
@@ -267,7 +303,7 @@ function sendNextQuestion() {
 
   if (questionTimeout) clearTimeout(questionTimeout);
   questionTimeout = setTimeout(() => {
-    logDoctor(`?? Hasta 5 saniye içinde cevap vermedi! Yanlış sayıldı.`);
+    logDoctor(`⚠️ Hasta 5 saniye içinde cevap vermedi! Yanlış sayıldı.`);
     handlePatientData({ type: 'answer', answer: 'SÜRE DOLDU' }); 
   }, 5000);
 }
@@ -367,11 +403,10 @@ function connectToDoctor(doctorId) {
   conn = connection;
 
   conn.on('open', () => {
-    document.getElementById('patientStatus').innerText = "Bağlantı kuruldu!";
+    // Bağlantı kurulunca tarama ekranını tamamen gizle, test ekranını aç
     document.getElementById('patientScannerArea').style.display = 'none';
     document.getElementById('patientTestArea').style.display = 'flex';
-    
-    document.getElementById('patientWarning').style.display = 'block';
+    // Uyarılar zaten pre-scan'de okundu, test ekranında tekrar göstermiyoruz.
   });
 
   conn.on('data', (data) => {
@@ -496,14 +531,20 @@ function calculateResults() {
   };
 
   conn.send(resultsData);
-  showPatientResults(resultsData);
-  logDoctor("Test tamamlandı. Sonuçlar hastaya gönderildi.");
+  
+  // Sonuçları hem hastaya hem doktora göster
+  showResultsUI(resultsData, 'patientDiagnosis');
+  showResultsUI(resultsData, 'doctorDiagnosis');
+
+  // Doktor ekranını güncelle
+  document.getElementById('doctorTestArea').style.display = 'none';
+  document.getElementById('doctorResultArea').style.display = 'flex';
+  document.getElementById('doctorLogResult').innerHTML = document.getElementById('doctorLog').innerHTML;
+  
+  logDoctor("Test tamamlandı. Sonuçlar ekranda gösteriliyor.");
 }
 
-function showPatientResults(data) {
-  document.getElementById('patientTestArea').style.display = 'none';
-  document.getElementById('patientResultArea').style.display = 'flex';
-  
+function showResultsUI(data, elementId) {
   const html = `
     <h3>Sol Göz Sonucu</h3>
     <div class="result-row"><span>Durum:</span> <b>${data.left.status}</b></div>
@@ -518,7 +559,13 @@ function showPatientResults(data) {
     ${data.right.degree ? `<div class="result-row"><span>Tahmini Derece:</span> <b>${data.right.degree}</b></div>` : ''}
   `;
   
-  document.getElementById('patientDiagnosis').innerHTML = html;
+  document.getElementById(elementId).innerHTML = html;
+}
+
+function showPatientResults(data) {
+  document.getElementById('patientTestArea').style.display = 'none';
+  document.getElementById('patientResultArea').style.display = 'flex';
+  showResultsUI(data, 'patientDiagnosis');
 }
 
 function logDoctor(msg) {
