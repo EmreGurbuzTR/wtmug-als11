@@ -37,36 +37,20 @@
   
   .status-box { padding:15px; border-radius:10px; background:var(--surface); border:1px solid var(--border); font-size:16px; margin:10px 0; }
   
-  /* Bilgilendirme Uyarı Alanı (Pre-Scan) */
   .warning-box { 
-    display:block; 
-    background:var(--danger); 
-    color:white; 
-    padding:20px; 
-    border-radius:12px; 
-    font-weight:bold; 
-    font-size:14px; 
-    line-height: 1.6;
-    text-align: left;
-    margin-bottom:20px; 
-    box-shadow: 0 4px 15px rgba(248,113,113,0.4);
-    border: 2px solid #ffb3b3;
-    max-width: 400px;
-    width: 100%;
-    box-sizing: border-box;
+    display:block; background:var(--danger); color:white; padding:20px; border-radius:12px; 
+    font-weight:bold; font-size:14px; line-height: 1.6; text-align: left; margin-bottom:20px; 
+    box-shadow: 0 4px 15px rgba(248,113,113,0.4); border: 2px solid #ffb3b3; max-width: 400px; width: 100%; box-sizing: border-box;
   }
   .warning-box .warn-title { text-align: center; font-size: 18px; margin-bottom: 10px; text-transform: uppercase; }
   .warning-box .highlight { background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; }
   
-  /* Onay Kutusu */
   .confirm-area { 
     display: flex; align-items: center; justify-content: center; gap: 10px; 
     background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; 
     margin-top: 15px; cursor: pointer; font-size: 15px;
   }
-  .confirm-area input[type="checkbox"] { 
-    width: 24px; height: 24px; cursor: pointer; accent-color: var(--accent); 
-  }
+  .confirm-area input[type="checkbox"] { width: 24px; height: 24px; cursor: pointer; accent-color: var(--accent); }
 
   .diagnosis-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; width:100%; max-width:400px; text-align:left; }
   .diagnosis-card h3 { color:var(--blue); margin-top:0; }
@@ -107,7 +91,6 @@
       <div class="log-box" id="doctorLog"></div>
     </div>
 
-    <!-- DOKTOR SONUÇ EKRANI -->
     <div id="doctorResultArea" style="display:none; width:100%; align-items:center; flex-direction:column;">
       <h2 style="color:var(--accent);">Test Tamamlandı (Hasta Sonuçları)</h2>
       <div class="diagnosis-card" id="doctorDiagnosis"></div>
@@ -117,8 +100,6 @@
 
   <!-- HASTA EKRANI -->
   <div id="patientScreen" class="screen">
-    
-    <!-- 1. Aşama: Bilgilendirme ve Onay -->
     <div id="patientPreScanArea" style="display:none; width:100%; flex-direction:column; align-items:center;">
       <div class="warning-box">
         <div class="warn-title">⚠️ LÜTFEN DİKKAT!</div>
@@ -129,16 +110,13 @@
           <span style="font-size:12px; font-weight:normal;">(Lütfen "O" harfini "0" (sıfır) olarak değil, "O" olarak giriniz.)</span>
         </div>
       </div>
-      
       <label class="confirm-area" for="patientConfirmCheck">
         <input type="checkbox" id="patientConfirmCheck" onchange="toggleScanButton()">
         <span>Okudum, anladım.</span>
       </label>
-      
       <button id="btnStartScan" class="btn btn-primary" disabled onclick="beginScanning()" style="margin-top:10px;">Kamerayı Başlat</button>
     </div>
 
-    <!-- 2. Aşama: QR Tarama -->
     <div id="patientScannerArea" style="display:none;">
       <h2>Doktorun QR Kodunu Okutun</h2>
       <div id="scannerContainer">
@@ -147,9 +125,9 @@
       <div id="patientStatus" class="status-box">Kamera Başlatılıyor...</div>
     </div>
 
-    <!-- 3. Aşama: Test -->
     <div id="patientTestArea" style="display:none; width:100%; align-items:center; flex-direction:column;">
-      <div id="patientTimer" class="timer-text" style="display:none;">5</div>
+      <!-- Hasta tarafında da her zaman görünecek olan zamanlayıcı -->
+      <div id="patientTimer" class="timer-text" style="display:none;">60</div>
       <div id="patientInstruction" class="status-box">Lütfen bekleyin...</div>
       
       <div id="patientInputContainer" class="patient-input-area">
@@ -159,7 +137,6 @@
       </div>
     </div>
 
-    <!-- 4. Aşama: Hasta Sonuç -->
     <div id="patientResultArea" style="display:none; width:100%; align-items:center; flex-direction:column;">
       <h2 style="color:var(--accent);">Test Tamamlandı</h2>
       <div class="diagnosis-card" id="patientDiagnosis"></div>
@@ -199,7 +176,6 @@ function startRole(role) {
     initDoctor();
   } else {
     document.getElementById('patientScreen').classList.add('active');
-    // Hasta önce bilgilendirme ekranını görür
     document.getElementById('patientPreScanArea').style.display = 'flex';
   }
 }
@@ -241,6 +217,7 @@ function initDoctor() {
     
     conn.on('data', (data) => handlePatientData(data));
     
+    // Bağlantı kurulduğu an 60 saniye başlar
     startSetupTimer(60, 'Sol Göz Hazırlığı', () => {
       startEyeTest('left');
     });
@@ -403,10 +380,16 @@ function connectToDoctor(doctorId) {
   conn = connection;
 
   conn.on('open', () => {
-    // Bağlantı kurulunca tarama ekranını tamamen gizle, test ekranını aç
     document.getElementById('patientScannerArea').style.display = 'none';
     document.getElementById('patientTestArea').style.display = 'flex';
-    // Uyarılar zaten pre-scan'de okundu, test ekranında tekrar göstermiyoruz.
+    
+    // 60 saniyelik süre hasta ekranında hemen görünsün
+    const timerEl = document.getElementById('patientTimer');
+    timerEl.style.display = 'block';
+    timerEl.innerText = '60';
+    timerEl.style.color = "var(--danger)";
+    document.getElementById('patientInstruction').innerText = "Sol Göz Hazırlığı - Hasta hazırlanıyor...";
+    document.getElementById('patientInputContainer').style.display = 'none';
   });
 
   conn.on('data', (data) => {
@@ -531,12 +514,9 @@ function calculateResults() {
   };
 
   conn.send(resultsData);
-  
-  // Sonuçları hem hastaya hem doktora göster
   showResultsUI(resultsData, 'patientDiagnosis');
   showResultsUI(resultsData, 'doctorDiagnosis');
 
-  // Doktor ekranını güncelle
   document.getElementById('doctorTestArea').style.display = 'none';
   document.getElementById('doctorResultArea').style.display = 'flex';
   document.getElementById('doctorLogResult').innerHTML = document.getElementById('doctorLog').innerHTML;
